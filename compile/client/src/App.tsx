@@ -34,15 +34,15 @@ const versions: Record<Language, string[]> = {
 
 const themeConfig = {
   dark: {
-    bg: '#121212',
-    surface: '#1e1e1e',
+    bg: '#020202',
+    surface: '#080808',
     accent: '#47cf73',
     text: '#ffffff',
     textMuted: '#a0a0a0',
-    headerBg: '#1a1a1a',
+    headerBg: '#050505',
     buttonColor: '#ffffff',
-    border: '#333333',
-    shadow: 'rgba(0,0,0,0.5)',
+    border: '#1a1a1a',
+    shadow: 'rgba(0,0,0,0.8)',
     editorTheme: 'vs-dark'
   },
   light: {
@@ -60,11 +60,15 @@ const themeConfig = {
 };
 
 function App() {
-  const [language, setLanguage] = useState<Language>('python');
+  const [language, setLanguage] = useState<Language>(() => {
+    const savedLang = sessionStorage.getItem('selected_language') as Language;
+    return savedLang || 'python';
+  });
   const [theme, setTheme] = useState<Theme>('dark');
   const [code, setCode] = useState(() => {
-    const savedCode = sessionStorage.getItem('code_python');
-    return savedCode || templates.python;
+    const savedLang = sessionStorage.getItem('selected_language') as Language || 'python';
+    const savedCode = sessionStorage.getItem(`code_${savedLang}`);
+    return savedCode || templates[savedLang];
   });
   const [isRunning, setIsRunning] = useState(false);
   const [isInitializing, setIsInitializing] = useState(true);
@@ -76,20 +80,11 @@ function App() {
 
   const colors = themeConfig[theme];
 
-  // Persistence: Save code to sessionStorage whenever it changes
+  // Persistence: Save code and language to sessionStorage
   useEffect(() => {
     sessionStorage.setItem(`code_${language}`, code);
+    sessionStorage.setItem('selected_language', language);
   }, [code, language]);
-
-  // Persistence: Load code when language changes
-  useEffect(() => {
-    const savedCode = sessionStorage.getItem(`code_${language}`);
-    if (savedCode) {
-      setCode(savedCode);
-    } else {
-      setCode(templates[language]);
-    }
-  }, [language]);
 
   // Initialize Terminal
   useLayoutEffect(() => {
@@ -270,15 +265,15 @@ function App() {
   const toggleTheme = () => setTheme(prev => prev === 'dark' ? 'light' : 'dark');
 
   const handleEditorDidMount = (editor: any, monaco: any) => {
-    if (!monaco?.languages?.python) return;
     // Configure Python language defaults
-    monaco.languages.python.pythonDefaults.setDiagnosticsOptions({
-      noSemanticValidation: false,
-      noSyntaxValidation: false,
-    });
+    if (monaco?.languages?.python) {
+      monaco.languages.python.pythonDefaults.setDiagnosticsOptions({
+        noSemanticValidation: false,
+        noSyntaxValidation: false,
+      });
 
-    // Provide extra library definitions for common Python modules
-    const pythonLibSource = `
+      // Provide extra library definitions for common Python modules
+      const pythonLibSource = `
 declare class math {
     static ceil(x: number): number;
     static floor(x: number): number;
@@ -295,11 +290,40 @@ declare class sys {
     static version: string;
     static path: string[];
 }
-    `;
+      `;
 
-    monaco.languages.python.pythonDefaults.setExtraLibs([
-      { content: pythonLibSource, filePath: 'lib.python.d.ts' }
-    ]);
+      monaco.languages.python.pythonDefaults.setExtraLibs([
+        { content: pythonLibSource, filePath: 'lib.python.d.ts' }
+      ]);
+    }
+
+    // Configure Java language defaults
+    if (monaco?.languages?.java) {
+      const javaLibSource = `
+declare namespace java.util {
+    class ArrayList<E> {
+        add(e: E): boolean;
+        get(index: number): E;
+        size(): number;
+    }
+    class HashMap<K, V> {
+        put(key: K, value: V): V;
+        get(key: any): V;
+        size(): number;
+    }
+}
+declare class System {
+    static out: {
+        println(s: any): void;
+        print(s: any): void;
+    };
+}
+      `;
+
+      monaco.languages.java.javaDefaults.setExtraLibs([
+        { content: javaLibSource, filePath: 'lib.java.d.ts' }
+      ]);
+    }
   };
 
   return (
@@ -347,7 +371,8 @@ declare class sys {
               onChange={(e) => {
                 const lang = e.target.value as Language;
                 setLanguage(lang);
-                setCode(templates[lang]);
+                const savedCode = sessionStorage.getItem(`code_${lang}`);
+                setCode(savedCode || templates[lang]);
                 xterm.current?.clear();
               }}
               style={{
@@ -440,7 +465,7 @@ declare class sys {
               quickSuggestions: { other: true, comments: false, strings: true },
               suggestOnTriggerCharacters: true,
               parameterHints: { enabled: true },
-              wordBasedSuggestions: 'currentDocument',
+              wordBasedSuggestions: true as any,
               formatOnType: true,
               autoClosingBrackets: 'always',
               autoClosingQuotes: 'always',
