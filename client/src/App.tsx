@@ -61,6 +61,9 @@ const getFileName = (lang: string) => {
   }
 };
 
+// API Configuration
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+
 function App() {
   const [language, setLanguage] = useState<Language>(() => {
     return (sessionStorage.getItem('last_language') as Language) || 'python';
