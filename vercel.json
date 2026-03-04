@@ -1,0 +1,12 @@
+{
+    "version": 2,
+    "rootDirectory": "client",
+    "buildCommand": "npm install && npm run build",
+    "outputDirectory": "build",
+    "rewrites": [
+        {
+            "source": "/(.*)",
+            "destination": "/index.html"
+        }
+    ]
+}
